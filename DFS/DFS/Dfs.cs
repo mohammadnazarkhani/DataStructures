@@ -51,6 +51,18 @@ namespace DFS
             return SearchRecursive(startNode, searchingCriteria);
         }
 
+        public bool TrySearch(Graph graph, Node startNode, Func<Node, bool> searchingCriteria, out Node? foundNode)
+        {
+            ThrowIfNull(graph);
+            ThrowIfNull(startNode);
+            ThrowIfNull(searchingCriteria);
+
+            graph.ResetVisited();
+
+            foundNode = SearchRecursive(startNode, searchingCriteria);
+            return foundNode != null;
+        }
+
         public Node? SearchRecursive(Node current, Func<Node, bool> searchingCriteria)
         {
             current.IsVisited = true;
