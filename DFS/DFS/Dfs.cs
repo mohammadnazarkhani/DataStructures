@@ -8,6 +8,7 @@ namespace DFS
 {
     /// <summary>
     /// Provides methods to perform Depth First Search (DFS) traversal and search operations on a graph.
+    /// Supports both recursive and iterative approaches, as well as pre-order and post-order traversals.
     /// </summary>
     public class Dfs
     {
@@ -16,13 +17,21 @@ namespace DFS
         /// </summary>
         /// <param name="graph">The graph to traverse.</param>
         /// <param name="startNode">The node from which to start the traversal.</param>
+        /// <param name="visitAction">An action to perform on each visited node (optional).</param>
+        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <param name="approach">The DFS approach to use (Recursive or Iterative).</param>
         /// <returns>
         /// A list of nodes in the order they were visited during the traversal.
         /// </returns>
         /// <exception cref="ArgumentNullException">
         /// Thrown if <paramref name="graph"/> or <paramref name="startNode"/> is <c>null</c>.
         /// </exception>
-        public List<Node> Traverse(Graph graph, Node startNode)
+        public List<Node> Traverse(
+            Graph graph,
+            Node startNode,
+            Action<Node>? visitAction = null,
+            DfsOrder order = DfsOrder.PreOrder,
+            DfsApproach approach = DfsApproach.Recursive)
         {
             ThrowIfNull(graph);
             ThrowIfNull(startNode);
@@ -30,7 +39,17 @@ namespace DFS
             graph.ResetVisited();
 
             var visitedNodes = new List<Node>();
-            TraverseRecursive(startNode, visitedNodes);
+            switch (approach)
+            {
+                case DfsApproach.Recursive:
+                    TraverseRecursive(startNode, visitedNodes, visitAction, order);
+                    break;
+                case DfsApproach.Iterative:
+                    TraverseIterative(startNode, visitedNodes, visitAction, order);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(approach), approach, "Invalid DFS approach.");
+            }
             return visitedNodes;
         }
 
@@ -39,16 +58,98 @@ namespace DFS
         /// </summary>
         /// <param name="current">The current node being visited.</param>
         /// <param name="visitedNodes">The list of nodes that have been visited so far.</param>
+        /// <param name="visitAction">An action to perform on each visited node (optional).</param>
+        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
         /// <remarks>
         /// This method is intended for internal use by <see cref="Traverse"/>.
         /// </remarks>
-        public void TraverseRecursive(Node current, List<Node> visitedNodes)
+        private void TraverseRecursive(
+            Node current,
+            List<Node> visitedNodes,
+            Action<Node>? visitAction,
+            DfsOrder order)
         {
             current.IsVisited = true;
-            visitedNodes.Add(current);
+
+            if (order == DfsOrder.PreOrder)
+            {
+                visitedNodes.Add(current);
+                visitAction?.Invoke(current);
+            }
 
             foreach (var neighbor in current.Neighbors)
-                if (!neighbor.IsVisited) TraverseRecursive(neighbor, visitedNodes);
+            {
+                if (!neighbor.IsVisited)
+                    TraverseRecursive(neighbor, visitedNodes, visitAction, order);
+            }
+
+            if (order == DfsOrder.PostOrder)
+            {
+                visitedNodes.Add(current);
+                visitAction?.Invoke(current);
+            }
+        }
+
+        /// <summary>
+        /// Iteratively traverses the graph using DFS from the specified node.
+        /// </summary>
+        /// <param name="startNode">The node from which to start the traversal.</param>
+        /// <param name="visitedNodes">The list of nodes that have been visited so far.</param>
+        /// <param name="visitAction">An action to perform on each visited node (optional).</param>
+        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <remarks>
+        /// This method is intended for internal use by <see cref="Traverse"/>.
+        /// </remarks>
+        private void TraverseIterative(
+            Node startNode,
+            List<Node> visitedNodes,
+            Action<Node>? visitAction,
+            DfsOrder order)
+        {
+            ThrowIfNull(visitedNodes);
+            ThrowIfNull(startNode);
+
+            var stack = new Stack<(Node node, bool postVisit)>();
+            stack.Push((startNode, false));
+
+            while (stack.Count > 0)
+            {
+                var (node, postVisit) = stack.Pop();
+
+                if (!node.IsVisited)
+                {
+                    if (order == DfsOrder.PreOrder && !postVisit)
+                    {
+                        node.IsVisited = true;
+                        visitedNodes.Add(node);
+                        visitAction?.Invoke(node);
+
+                        foreach (var neighbor in node.Neighbors.Reverse<Node>())
+                        {
+                            if (!neighbor.IsVisited)
+                                stack.Push((neighbor, false));
+                        }
+                    }
+                    else if (order == DfsOrder.PostOrder)
+                    {
+                        if (!postVisit)
+                        {
+                            stack.Push((node, true));
+                            foreach (var neighbor in node.Neighbors.Reverse<Node>())
+                            {
+                                if (!neighbor.IsVisited)
+                                    stack.Push((neighbor, false));
+                            }
+                        }
+                        else
+                        {
+                            node.IsVisited = true;
+                            visitedNodes.Add(node);
+                            visitAction?.Invoke(node);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -56,24 +157,34 @@ namespace DFS
         /// </summary>
         /// <param name="graph">The graph to search.</param>
         /// <param name="startNode">The node from which to start the search.</param>
-        /// <param name="searchingCriteria">
-        /// A predicate function that determines whether a node matches the search criteria.
-        /// </param>
+        /// <param name="searchingCriteria">A predicate function that determines whether a node matches the search criteria.</param>
+        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <param name="approach">The DFS approach to use (Recursive or Iterative).</param>
         /// <returns>
         /// The first node that matches the search criteria, or <c>null</c> if no such node is found.
         /// </returns>
         /// <exception cref="ArgumentNullException">
         /// Thrown if <paramref name="graph"/>, <paramref name="startNode"/>, or <paramref name="searchingCriteria"/> is <c>null</c>.
         /// </exception>
-        public Node? Search(Graph graph, Node startNode, Func<Node, bool> searchingCriteria)
+        public Node? Search(
+            Graph graph,
+            Node startNode,
+            Func<Node, bool> searchingCriteria,
+            DfsOrder order = DfsOrder.PreOrder,
+            DfsApproach approach = DfsApproach.Recursive)
         {
             ThrowIfNull(graph);
             ThrowIfNull(startNode);
             ThrowIfNull(searchingCriteria);
 
-            graph.ResetVisited();
+            Node? foundNode = null;
+            Traverse(graph, startNode, node =>
+            {
+                if (foundNode == null && searchingCriteria(node))
+                    foundNode = node;
+            }, order, approach);
 
-            return SearchRecursive(startNode, searchingCriteria);
+            return foundNode;
         }
 
         /// <summary>
@@ -81,54 +192,28 @@ namespace DFS
         /// </summary>
         /// <param name="graph">The graph to search.</param>
         /// <param name="startNode">The node from which to start the search.</param>
-        /// <param name="searchingCriteria">
-        /// A predicate function that determines whether a node matches the search criteria.
-        /// </param>
+        /// <param name="searchingCriteria">A predicate function that determines whether a node matches the search criteria.</param>
         /// <param name="foundNode">
         /// When this method returns, contains the first node that matches the search criteria, or <c>null</c> if no such node is found.
         /// </param>
+        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <param name="approach">The DFS approach to use (Recursive or Iterative).</param>
         /// <returns>
         /// <c>true</c> if a matching node is found; otherwise, <c>false</c>.
         /// </returns>
         /// <exception cref="ArgumentNullException">
         /// Thrown if <paramref name="graph"/>, <paramref name="startNode"/>, or <paramref name="searchingCriteria"/> is <c>null</c>.
         /// </exception>
-        public bool TrySearch(Graph graph, Node startNode, Func<Node, bool> searchingCriteria, out Node? foundNode)
+        public bool TrySearch(
+            Graph graph,
+            Node startNode,
+            Func<Node, bool> searchingCriteria,
+            out Node? foundNode,
+            DfsOrder order = DfsOrder.PreOrder,
+            DfsApproach approach = DfsApproach.Recursive)
         {
-            ThrowIfNull(graph);
-            ThrowIfNull(startNode);
-            ThrowIfNull(searchingCriteria);
-
-            graph.ResetVisited();
-
-            foundNode = SearchRecursive(startNode, searchingCriteria);
+            foundNode = Search(graph, startNode, searchingCriteria, order, approach);
             return foundNode != null;
-        }
-
-        /// <summary>
-        /// Recursively searches for a node that matches the specified criteria using DFS.
-        /// </summary>
-        /// <param name="current">The current node being visited.</param>
-        /// <param name="searchingCriteria">
-        /// A predicate function that determines whether a node matches the search criteria.
-        /// </param>
-        /// <returns>
-        /// The first node that matches the search criteria, or <c>null</c> if no such node is found.
-        /// </returns>
-        public Node? SearchRecursive(Node current, Func<Node, bool> searchingCriteria)
-        {
-            current.IsVisited = true;
-            if (searchingCriteria(current)) return current;
-
-            foreach (var neighbor in current.Neighbors)
-            {
-                if (!neighbor.IsVisited)
-                {
-                    var result = SearchRecursive(neighbor, searchingCriteria);
-                    if (result != null) return result;
-                }
-            }
-            return null;
         }
 
         /// <summary>
