@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace DFS
 {
@@ -20,6 +21,7 @@ namespace DFS
         /// <param name="visitAction">An action to perform on each visited node (optional).</param>
         /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
         /// <param name="approach">The DFS approach to use (Recursive or Iterative).</param>
+        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <returns>
         /// A list of nodes in the order they were visited during the traversal.
         /// </returns>
@@ -31,7 +33,8 @@ namespace DFS
             Node startNode,
             Action<Node>? visitAction = null,
             DfsOrder order = DfsOrder.PreOrder,
-            DfsApproach approach = DfsApproach.Recursive)
+            DfsApproach approach = DfsApproach.Recursive,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfNull(graph);
             ThrowIfNull(startNode);
@@ -42,10 +45,10 @@ namespace DFS
             switch (approach)
             {
                 case DfsApproach.Recursive:
-                    TraverseRecursive(startNode, visitedNodes, visitAction, order);
+                    TraverseRecursive(startNode, visitedNodes, visitAction, order, cancellationToken);
                     break;
                 case DfsApproach.Iterative:
-                    TraverseIterative(startNode, visitedNodes, visitAction, order);
+                    TraverseIterative(startNode, visitedNodes, visitAction, order, cancellationToken);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(approach), approach, "Invalid DFS approach.");
@@ -59,7 +62,8 @@ namespace DFS
         /// <param name="current">The current node being visited.</param>
         /// <param name="visitedNodes">The list of nodes that have been visited so far.</param>
         /// <param name="visitAction">An action to perform on each visited node (optional).</param>
-        /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <param name="order">The order in which to visit nodes (PreOrder  or PostOrder).</param>
+        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <remarks>
         /// This method is intended for internal use by <see cref="Traverse"/>.
         /// </remarks>
@@ -67,8 +71,10 @@ namespace DFS
             Node current,
             List<Node> visitedNodes,
             Action<Node>? visitAction,
-            DfsOrder order)
+            DfsOrder order,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             current.IsVisited = true;
 
             if (order == DfsOrder.PreOrder)
@@ -79,11 +85,14 @@ namespace DFS
 
             foreach (var neighbor in current.Neighbors)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
                 if (!neighbor.IsVisited)
-                    TraverseRecursive(neighbor, visitedNodes, visitAction, order);
+                    TraverseRecursive(neighbor, visitedNodes, visitAction, order, cancellationToken);
             }
 
-            if (order == DfsOrder.PostOrder)
+            if (!cancellationToken.IsCancellationRequested && order == DfsOrder.PostOrder)
             {
                 visitedNodes.Add(current);
                 visitAction?.Invoke(current);
@@ -97,6 +106,7 @@ namespace DFS
         /// <param name="visitedNodes">The list of nodes that have been visited so far.</param>
         /// <param name="visitAction">An action to perform on each visited node (optional).</param>
         /// <param name="order">The order in which to visit nodes (PreOrder or PostOrder).</param>
+        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <remarks>
         /// This method is intended for internal use by <see cref="Traverse"/>.
         /// </remarks>
@@ -104,7 +114,8 @@ namespace DFS
             Node startNode,
             List<Node> visitedNodes,
             Action<Node>? visitAction,
-            DfsOrder order)
+            DfsOrder order,
+            CancellationToken cancellationToken)
         {
             ThrowIfNull(visitedNodes);
             ThrowIfNull(startNode);
@@ -112,7 +123,7 @@ namespace DFS
             var stack = new Stack<(Node node, bool postVisit)>();
             stack.Push((startNode, false));
 
-            while (stack.Count > 0)
+            while (stack.Count > 0 && !cancellationToken.IsCancellationRequested)
             {
                 var (node, postVisit) = stack.Pop();
 
@@ -178,11 +189,23 @@ namespace DFS
             ThrowIfNull(searchingCriteria);
 
             Node? foundNode = null;
-            Traverse(graph, startNode, node =>
+            using var cts = new CancellationTokenSource();
+
+            try
             {
-                if (foundNode == null && searchingCriteria(node))
-                    foundNode = node;
-            }, order, approach);
+                Traverse(graph, startNode, node =>
+                {
+                    if (searchingCriteria(node))
+                    {
+                        foundNode = node;
+                        cts.Cancel();
+                    }
+                }, order, approach, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Search was cancelled because we found the node, this is expected
+            }
 
             return foundNode;
         }

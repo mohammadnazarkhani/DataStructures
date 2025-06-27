@@ -23,41 +23,55 @@ graph.AddEdge(node1, node34);
 graph.AddEdge(node34, node44);
 graph.AddEdge(node1, node77);
 
-Console.ForegroundColor = ConsoleColor.Cyan;
-Console.WriteLine("=== Traversing the graph ===\n");
-Console.ResetColor();
-
 var dfs = new Dfs();
-var traversingOrder = dfs.Traverse(graph, node1).ToList();
 
-Console.ForegroundColor = ConsoleColor.Yellow;
-Console.WriteLine("Traversing order:");
+// --- PreOrder Traversal ---
+Console.ForegroundColor = ConsoleColor.Cyan;
+Console.WriteLine("=== PreOrder Traversal ===\n");
 Console.ResetColor();
-
-for (int i = 0; i < traversingOrder.Count; i++)
+var preOrder = dfs.Traverse(graph, node1, null, DfsOrder.PreOrder);
+Console.ForegroundColor = ConsoleColor.Yellow;
+Console.WriteLine("PreOrder traversing order:");
+Console.ResetColor();
+for (int i = 0; i < preOrder.Count; i++)
 {
     Console.ForegroundColor = ConsoleColor.Green;
-    Console.Write($"[{i}] {traversingOrder[i].Value}\t");
+    Console.Write($"[{i}] {preOrder[i].Value}\t");
     Console.ResetColor();
 }
 Console.WriteLine();
 
+// --- PostOrder Traversal ---
 Console.ForegroundColor = ConsoleColor.Cyan;
-Console.WriteLine("\n=== Searching for number 44 ===");
+Console.WriteLine("\n=== PostOrder Traversal ===\n");
 Console.ResetColor();
-
-if (dfs.TrySearch(graph, node1, n => n.Value == 44, out var foundNode))
+var postOrder = dfs.Traverse(graph, node1, null, DfsOrder.PostOrder);
+Console.ForegroundColor = ConsoleColor.Yellow;
+Console.WriteLine("PostOrder traversing order:");
+Console.ResetColor();
+for (int i = 0; i < postOrder.Count; i++)
 {
     Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"\nFound node with value: {foundNode?.Value}");
+    Console.Write($"[{i}] {postOrder[i].Value}\t");
     Console.ResetColor();
+}
+Console.WriteLine();
 
-    for (int i = 0; i < traversingOrder.Count; i++)
+// --- PreOrder Search ---
+Console.ForegroundColor = ConsoleColor.Cyan;
+Console.WriteLine("\n=== Searching for number 44 (PreOrder) ===");
+Console.ResetColor();
+if (dfs.TrySearch(graph, node1, n => n.Value == 44, out var foundNodePre, DfsOrder.PreOrder))
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine($"\nFound node with value: {foundNodePre?.Value}");
+    Console.ResetColor();
+    for (int i = 0; i < preOrder.Count; i++)
     {
-        if (traversingOrder[i].Value == foundNode?.Value)
+        if (preOrder[i].Value == foundNodePre?.Value)
         {
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"Node with value {foundNode.Value} found at index {i} in the traversing order.");
+            Console.WriteLine($"Node with value {foundNodePre.Value} found at index {i} in the PreOrder traversing order.");
             Console.ResetColor();
             break;
         }
@@ -66,6 +80,33 @@ if (dfs.TrySearch(graph, node1, n => n.Value == 44, out var foundNode))
 else
 {
     Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine("✘ Node with value 44 not found.");
+    Console.WriteLine("✘ Node with value 44 not found in PreOrder search.");
+    Console.ResetColor();
+}
+
+// --- PostOrder Search ---
+Console.ForegroundColor = ConsoleColor.Cyan;
+Console.WriteLine("\n=== Searching for number 44 (PostOrder) ===");
+Console.ResetColor();
+if (dfs.TrySearch(graph, node1, n => n.Value == 44, out var foundNodePost, DfsOrder.PostOrder))
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine($"\nFound node with value: {foundNodePost?.Value}");
+    Console.ResetColor();
+    for (int i = 0; i < postOrder.Count; i++)
+    {
+        if (postOrder[i].Value == foundNodePost?.Value)
+        {
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"Node with value {foundNodePost.Value} found at index {i} in the PostOrder traversing order.");
+            Console.ResetColor();
+            break;
+        }
+    }
+}
+else
+{
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine("✘ Node with value 44 not found in PostOrder search.");
     Console.ResetColor();
 }
